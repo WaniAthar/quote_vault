@@ -9,7 +9,7 @@ import es.antonborri.home_widget.HomeWidgetProvider
 class QuoteWidgetProvider : HomeWidgetProvider() {
     override fun onUpdate(
         context: Context,
-        appWidgetManager: AppWidgetManager,
+        appWidggit puetManager: AppWidgetManager,
         appWidgetIds: IntArray,
         widgetData: SharedPreferences
     ) {
