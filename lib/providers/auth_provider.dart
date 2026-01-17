@@ -5,10 +5,12 @@ class AuthProvider with ChangeNotifier {
   final SupabaseClient _supabase = Supabase.instance.client;
   User? _user;
   bool _isLoading = true;
+  bool _isRecoveryMode = false;
 
   User? get user => _user;
   bool get isAuthenticated => _user != null;
   bool get isLoading => _isLoading;
+  bool get isRecoveryMode => _isRecoveryMode;
 
   AuthProvider() {
     _initializeAuth();
@@ -33,6 +35,14 @@ class AuthProvider with ChangeNotifier {
 
       _user = user;
       _isLoading = false;
+
+      if (event == AuthChangeEvent.passwordRecovery) {
+        _isRecoveryMode = true;
+      } else if (event == AuthChangeEvent.signedIn ||
+          event == AuthChangeEvent.signedOut) {
+        _isRecoveryMode = false;
+      }
+
       notifyListeners();
     });
   }
@@ -98,6 +108,16 @@ class AuthProvider with ChangeNotifier {
       await _supabase.auth.resetPasswordForEmail(email);
     } catch (error) {
       throw Exception('Password reset failed: $error');
+    }
+  }
+
+  Future<void> updatePassword(String newPassword) async {
+    try {
+      await _supabase.auth.updateUser(UserAttributes(password: newPassword));
+      _isRecoveryMode = false;
+      notifyListeners();
+    } catch (error) {
+      throw Exception('Password update failed: $error');
     }
   }
 

@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
@@ -6,6 +7,7 @@ import 'package:screenshot/screenshot.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:gal/gal.dart';
 import '../../models/quote.dart';
 import '../../providers/quote_provider.dart';
 import '../../providers/theme_provider.dart';
@@ -13,8 +15,9 @@ import '../../providers/theme_provider.dart';
 class QuoteCard extends StatefulWidget {
   final Quote quote;
   final VoidCallback? onTap;
+  final VoidCallback? onRemove; // Add onRemove callback
 
-  const QuoteCard({super.key, required this.quote, this.onTap});
+  const QuoteCard({super.key, required this.quote, this.onTap, this.onRemove});
 
   @override
   State<QuoteCard> createState() => _QuoteCardState();
@@ -125,6 +128,16 @@ class _QuoteCardState extends State<QuoteCard> {
                           Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
+                              if (widget.onRemove != null) ...[
+                                _buildActionButton(
+                                  context,
+                                  icon: Icons.remove_circle_outline_rounded,
+                                  color: Colors.red,
+                                  onTap: widget.onRemove!,
+                                  tooltip: 'Remove from collection',
+                                ),
+                                const SizedBox(width: 8),
+                              ],
                               _buildActionButton(
                                 context,
                                 icon: Icons.playlist_add_rounded,
@@ -360,91 +373,141 @@ class _QuoteCardState extends State<QuoteCard> {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        decoration: BoxDecoration(
-          color: theme.scaffoldBackgroundColor,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.onSurface.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(2),
+      isScrollControlled: true, // Allow bottom sheet to take more height
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.6,
+        minChildSize: 0.4,
+        maxChildSize: 0.9,
+        builder: (_, controller) => Container(
+          decoration: BoxDecoration(
+            color: theme.scaffoldBackgroundColor,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: const EdgeInsets.all(24),
+          child: SingleChildScrollView(
+            controller: controller,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.onSurface.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
                 ),
-              ),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'Share Quote',
-              style: theme.textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 24),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.primaryContainer.withOpacity(0.3),
-                  shape: BoxShape.circle,
+                const SizedBox(height: 24),
+                Text(
+                  'Share Quote',
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-                child: Icon(
-                  Icons.text_fields_rounded,
-                  color: theme.colorScheme.primary,
+                const SizedBox(height: 24),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primaryContainer.withOpacity(
+                        0.3,
+                      ),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.text_fields_rounded,
+                      color: theme.colorScheme.primary,
+                    ),
+                  ),
+                  title: const Text(
+                    'Share as Text',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  onTap: () {
+                    Share.share(quoteText);
+                    Navigator.of(context).pop();
+                  },
                 ),
-              ),
-              title: const Text(
-                'Share as Text',
-                style: TextStyle(fontWeight: FontWeight.w600),
-              ),
-              onTap: () {
-                Share.share(quoteText);
-                Navigator.of(context).pop();
-              },
+                const SizedBox(height: 24),
+                const Text(
+                  'Share as Image',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      _buildStyleOption(context, 'Modern', [
+                        theme.colorScheme.primary,
+                        theme.colorScheme.secondary,
+                      ], false),
+                      _buildStyleOption(context, 'Nature', [
+                        const Color(0xFF2D6A4F),
+                        const Color(0xFF52B788),
+                      ], false),
+                      _buildStyleOption(context, 'Ocean', [
+                        const Color(0xFF0077B6),
+                        const Color(0xFF00B4D8),
+                      ], false),
+                      _buildStyleOption(context, 'Midnight', [
+                        const Color(0xFF2C3E50),
+                        const Color(0xFF4CA1AF),
+                      ], false),
+                      _buildStyleOption(context, 'Sunset', [
+                        const Color(0xFFDD5E89),
+                        const Color(0xFFF7BB97),
+                      ], false),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+                const Text(
+                  'Save to Gallery',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      _buildStyleOption(context, 'Modern', [
+                        theme.colorScheme.primary,
+                        theme.colorScheme.secondary,
+                      ], true),
+                      _buildStyleOption(context, 'Nature', [
+                        const Color(0xFF2D6A4F),
+                        const Color(0xFF52B788),
+                      ], true),
+                      _buildStyleOption(context, 'Ocean', [
+                        const Color(0xFF0077B6),
+                        const Color(0xFF00B4D8),
+                      ], true),
+                      _buildStyleOption(context, 'Midnight', [
+                        const Color(0xFF2C3E50),
+                        const Color(0xFF4CA1AF),
+                      ], true),
+                      _buildStyleOption(context, 'Sunset', [
+                        const Color(0xFFDD5E89),
+                        const Color(0xFFF7BB97),
+                      ], true),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+              ],
             ),
-            const SizedBox(height: 24),
-            const Text(
-              'Share as Image',
-              style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey),
-            ),
-            const SizedBox(height: 16),
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  _buildStyleOption(context, 'Modern', [
-                    theme.colorScheme.primary,
-                    theme.colorScheme.secondary,
-                  ]),
-                  _buildStyleOption(context, 'Nature', [
-                    const Color(0xFF2D6A4F),
-                    const Color(0xFF52B788),
-                  ]),
-                  _buildStyleOption(context, 'Ocean', [
-                    const Color(0xFF0077B6),
-                    const Color(0xFF00B4D8),
-                  ]),
-                  _buildStyleOption(context, 'Midnight', [
-                    const Color(0xFF2C3E50),
-                    const Color(0xFF4CA1AF),
-                  ]),
-                  _buildStyleOption(context, 'Sunset', [
-                    const Color(0xFFDD5E89),
-                    const Color(0xFFF7BB97),
-                  ]),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
-          ],
+          ),
         ),
       ),
     );
@@ -454,9 +517,10 @@ class _QuoteCardState extends State<QuoteCard> {
     BuildContext context,
     String name,
     List<Color> colors,
+    bool saveToGallery,
   ) {
     return GestureDetector(
-      onTap: () => _shareAsImage(context, colors),
+      onTap: () => _shareAsImage(context, colors, saveToGallery),
       child: Container(
         margin: const EdgeInsets.only(right: 12),
         width: 100,
@@ -477,90 +541,152 @@ class _QuoteCardState extends State<QuoteCard> {
           ],
         ),
         alignment: Alignment.center,
-        child: Text(
-          name,
-          style: const TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-            fontSize: 14,
-          ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              saveToGallery ? Icons.download_rounded : Icons.share_rounded,
+              color: Colors.white,
+              size: 24,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              name,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Future<void> _shareAsImage(BuildContext context, List<Color> colors) async {
+  Future<void> _shareAsImage(
+    BuildContext context,
+    List<Color> colors,
+    bool saveToGallery,
+  ) async {
     Navigator.of(context).pop();
 
     try {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Generating image...')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            saveToGallery ? 'Saving to gallery...' : 'Generating image...',
+          ),
+        ),
+      );
 
       final screenshotController = ScreenshotController();
 
       // Create a dedicated widget for image generation to ensure consistent styling
-      final quoteWidget = Container(
-        width: 1080, // High resolution width
-        height: 1080, // Square aspect ratio
-        padding: const EdgeInsets.all(80),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: colors,
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
+      final quoteWidget = Directionality(
+        textDirection: TextDirection.ltr,
+        child: Container(
+          width: 1080, // High resolution width
+          height: 1080, // Square aspect ratio
+          color: Colors.white, // Ensure base color
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: colors,
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+            ),
+            child: Stack(
+              children: [
+                Center(
+                  child: FittedBox(
+                    fit: BoxFit.contain,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(
+                        maxWidth: 900, // Leave padding
+                        maxHeight: 800,
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(40.0),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(
+                              Icons.format_quote_rounded,
+                              color: Colors.white70,
+                              size: 100,
+                            ),
+                            const SizedBox(height: 40),
+                            Text(
+                              widget.quote.text,
+                              style: GoogleFonts.inter(
+                                fontSize: 60,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                                height: 1.2,
+                                letterSpacing: -0.5,
+                                decoration: TextDecoration.none,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 40),
+                            Container(
+                              width: 80,
+                              height: 4,
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.5),
+                                borderRadius: BorderRadius.circular(2),
+                              ),
+                            ),
+                            const SizedBox(height: 24),
+                            Text(
+                              widget.quote.author ?? 'Unknown',
+                              style: GoogleFonts.inter(
+                                fontSize: 36,
+                                color: Colors.white.withOpacity(0.9),
+                                fontWeight: FontWeight.w500,
+                                letterSpacing: 0.5,
+                                decoration: TextDecoration.none,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  bottom: 40,
+                  left: 0,
+                  right: 0,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.format_quote,
+                        color: Colors.white.withOpacity(0.6),
+                        size: 32,
+                      ),
+                      const SizedBox(width: 12),
+                      Text(
+                        'QuoteVault',
+                        style: GoogleFonts.inter(
+                          fontSize: 28,
+                          color: Colors.white.withOpacity(0.6),
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 1.0,
+                          decoration: TextDecoration.none,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(
-              Icons.format_quote_rounded,
-              color: Colors.white70,
-              size: 80,
-            ),
-            const SizedBox(height: 40),
-            Text(
-              widget.quote.text,
-              style: GoogleFonts.inter(
-                fontSize: 60,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-                height: 1.3,
-              ),
-              textAlign: TextAlign.center,
-              maxLines: 10,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: 60),
-            Container(
-              width: 100,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.5),
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(height: 40),
-            Text(
-              widget.quote.author ?? 'Unknown',
-              style: GoogleFonts.inter(
-                fontSize: 36,
-                color: Colors.white.withOpacity(0.9),
-                fontWeight: FontWeight.w500,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const Spacer(),
-            Text(
-              'QuoteVault',
-              style: GoogleFonts.inter(
-                fontSize: 24,
-                color: Colors.white.withOpacity(0.5),
-                letterSpacing: 2,
-              ),
-            ),
-          ],
         ),
       );
 
@@ -577,14 +703,26 @@ class _QuoteCardState extends State<QuoteCard> {
       final file = File(imagePath);
       await file.writeAsBytes(imageBytes);
 
-      await Share.shareXFiles([
-        XFile(file.path),
-      ], text: 'Shared via QuoteVault');
+      if (saveToGallery) {
+        await Gal.putImage(file.path);
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Saved to Gallery!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } else {
+        await Share.shareXFiles([
+          XFile(file.path),
+        ], text: 'Shared via QuoteVault');
+      }
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('Error sharing image: $e')));
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     }
   }

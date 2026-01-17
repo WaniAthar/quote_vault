@@ -3,8 +3,10 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../screens/auth/login_screen.dart';
+import '../screens/auth/reset_password_screen.dart';
 import '../screens/auth/auth_test_screen.dart';
 import '../screens/home/home_screen.dart';
+import '../screens/home/quote_detail_screen.dart';
 import '../screens/profile/profile_screen.dart';
 import '../screens/collections/collection_detail_screen.dart';
 import '../models/collection.dart';
@@ -22,10 +24,17 @@ class AppRouter {
       refreshListenable: authProvider,
       redirect: (context, state) {
         final isAuthenticated = authProvider.isAuthenticated;
+        final isRecoveryMode = authProvider.isRecoveryMode;
         final isAuthRoute =
             state.matchedLocation == '/login' ||
-            state.matchedLocation == '/auth-test';
+            state.matchedLocation == '/auth-test' ||
+            state.matchedLocation == '/reset-password';
         final isGoingToAuth = state.matchedLocation.startsWith('/auth');
+
+        // If in recovery mode, force to reset password screen
+        if (isRecoveryMode && state.matchedLocation != '/reset-password') {
+          return '/reset-password';
+        }
 
         // If not authenticated and not on auth routes, redirect to login
         if (!isAuthenticated && !isAuthRoute && !isGoingToAuth) {
@@ -33,7 +42,9 @@ class AppRouter {
         }
 
         // If authenticated and on login page, redirect to home
-        if (isAuthenticated && state.matchedLocation == '/login') {
+        if (isAuthenticated &&
+            !isRecoveryMode &&
+            state.matchedLocation == '/login') {
           return '/';
         }
 
@@ -46,6 +57,10 @@ class AppRouter {
           builder: (context, state) => const LoginScreen(),
         ),
         GoRoute(
+          path: '/reset-password',
+          builder: (context, state) => const ResetPasswordScreen(),
+        ),
+        GoRoute(
           path: '/profile',
           builder: (context, state) => const ProfileScreen(),
         ),
@@ -54,6 +69,13 @@ class AppRouter {
           builder: (context, state) {
             final collection = state.extra as Collection;
             return CollectionDetailScreen(collection: collection);
+          },
+        ),
+        GoRoute(
+          path: '/quote',
+          builder: (context, state) {
+            final id = state.uri.queryParameters['id'];
+            return QuoteDetailScreen(quoteId: id);
           },
         ),
         GoRoute(

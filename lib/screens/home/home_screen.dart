@@ -24,6 +24,7 @@ class _HomeScreenState extends State<HomeScreen>
   late PageStorageBucket _bucket;
   int _selectedIndex = 0;
   final TextEditingController _searchController = TextEditingController();
+  bool _isInitializing = true;
 
   @override
   void initState() {
@@ -47,6 +48,12 @@ class _HomeScreenState extends State<HomeScreen>
     await quoteProvider.loadQuotes();
     await quoteProvider.loadFavorites();
     await quoteProvider.loadCollections();
+
+    if (mounted) {
+      setState(() {
+        _isInitializing = false;
+      });
+    }
   }
 
   @override
@@ -167,7 +174,8 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Widget _buildHomeTab(QuoteProvider quoteProvider) {
-    if (quoteProvider.isLoading && quoteProvider.quotes.isEmpty) {
+    if (_isInitializing ||
+        (quoteProvider.isLoading && quoteProvider.quotes.isEmpty)) {
       return const Center(child: CircularProgressIndicator());
     }
 
@@ -466,7 +474,11 @@ class _HomeScreenState extends State<HomeScreen>
 
         // Quotes list
         Expanded(
-          child: quoteProvider.quotes.isEmpty && !quoteProvider.isLoading
+          child:
+              (_isInitializing && quoteProvider.quotes.isEmpty) ||
+                  (quoteProvider.isLoading && quoteProvider.quotes.isEmpty)
+              ? const Center(child: CircularProgressIndicator())
+              : quoteProvider.quotes.isEmpty && !quoteProvider.isLoading
               ? _buildEmptyState(
                   context,
                   Icons.search_off_rounded,
@@ -537,45 +549,122 @@ class _HomeScreenState extends State<HomeScreen>
       );
     }
 
-    return RefreshIndicator(
-      onRefresh: () => quoteProvider.loadFavorites(),
-      child: AnimationLimiter(
-        child: ListView.builder(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          itemCount: quoteProvider.favorites.length,
-          itemBuilder: (context, index) {
-            return QuoteCard(quote: quoteProvider.favorites[index]);
-          },
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCollectionsTab(QuoteProvider quoteProvider) {
-    final theme = Theme.of(context);
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'My Collections',
+                'Favorites',
                 style: GoogleFonts.inter(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
                   letterSpacing: -0.5,
                 ),
               ),
-              FilledButton.icon(
-                onPressed: () =>
+              IconButton(
+                onPressed: () => _confirmClearFavorites(quoteProvider),
+                icon: const Icon(Icons.delete_sweep_rounded),
+                color: Theme.of(context).colorScheme.error,
+                tooltip: 'Clear all favorites',
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: () => quoteProvider.loadFavorites(),
+            child: AnimationLimiter(
+              child: ListView.builder(
+                padding: const EdgeInsets.only(bottom: 20),
+                itemCount: quoteProvider.favorites.length,
+                itemBuilder: (context, index) {
+                  return QuoteCard(quote: quoteProvider.favorites[index]);
+                },
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _confirmClearFavorites(QuoteProvider quoteProvider) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Clear Favorites?'),
+        content: const Text(
+          'Are you sure you want to remove all quotes from your favorites? This cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(context).colorScheme.error,
+            ),
+            child: const Text('Clear All'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      await quoteProvider.clearAllFavorites();
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('All favorites cleared')));
+      }
+    }
+  }
+
+  Widget _buildCollectionsTab(QuoteProvider quoteProvider) {
+    final theme = Theme.of(context);
+    final List<List<Color>> collectionGradients = [
+      [const Color(0xFF6B8DE3), const Color(0xFF3F5EFB)], // Blue
+      [const Color(0xFFFC466B), const Color(0xFF3F5EFB)], // Pink-Blue
+      [const Color(0xFF11998E), const Color(0xFF38EF7D)], // Green
+      [const Color(0xFFF2994A), const Color(0xFFF2C94C)], // Orange-Yellow
+      [const Color(0xFF8E2DE2), const Color(0xFF4A00E0)], // Purple
+      [const Color(0xFF00c6ff), const Color(0xFF0072ff)], // Sky Blue
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'My Collections',
+                style: GoogleFonts.inter(
+                  fontSize: 28,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.5,
+                ),
+              ),
+              GestureDetector(
+                onTap: () =>
                     _showCreateCollectionDialog(context, quoteProvider),
-                icon: const Icon(Icons.add_rounded, size: 18),
-                label: const Text('New'),
-                style: FilledButton.styleFrom(
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primary.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.add_rounded,
+                    color: theme.colorScheme.primary,
+                    size: 28,
                   ),
                 ),
               ),
@@ -602,72 +691,124 @@ class _HomeScreenState extends State<HomeScreen>
                 )
               : RefreshIndicator(
                   onRefresh: () => quoteProvider.loadCollections(),
-                  child: ListView.separated(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    itemCount: quoteProvider.collections.length,
-                    separatorBuilder: (context, index) =>
-                        const SizedBox(height: 12),
-                    itemBuilder: (context, index) {
-                      final collection = quoteProvider.collections[index];
-                      return Container(
-                        decoration: BoxDecoration(
-                          color:
-                              theme.cardTheme.color ??
-                              theme.colorScheme.surface,
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: theme.colorScheme.outline.withOpacity(0.1),
+                  child: AnimationLimiter(
+                    child: GridView.builder(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 8,
+                      ),
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 2,
+                            crossAxisSpacing: 16,
+                            mainAxisSpacing: 16,
+                            childAspectRatio: 0.85,
                           ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.05),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: ListTile(
-                          contentPadding: const EdgeInsets.all(16),
-                          leading: Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: theme.colorScheme.primaryContainer
-                                  .withOpacity(0.5),
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: Icon(
-                              Icons.folder_open_rounded,
-                              color: theme.colorScheme.primary,
-                            ),
-                          ),
-                          title: Text(
-                            collection.name,
-                            style: GoogleFonts.inter(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                            ),
-                          ),
-                          subtitle: FutureBuilder<int>(
-                            future: quoteProvider.getCollectionQuoteCount(
-                              collection.id,
-                            ),
-                            builder: (context, snapshot) {
-                              return Text(
-                                '${snapshot.data ?? collection.quoteCount} quotes',
-                                style: TextStyle(
-                                  color: theme.colorScheme.onSurfaceVariant,
+                      itemCount: quoteProvider.collections.length,
+                      itemBuilder: (context, index) {
+                        final collection = quoteProvider.collections[index];
+                        final gradient =
+                            collectionGradients[index %
+                                collectionGradients.length];
+
+                        return AnimationConfiguration.staggeredGrid(
+                          position: index,
+                          duration: const Duration(milliseconds: 500),
+                          columnCount: 2,
+                          child: ScaleAnimation(
+                            child: FadeInAnimation(
+                              child: GestureDetector(
+                                onTap: () =>
+                                    _viewCollection(context, collection),
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: gradient,
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                    ),
+                                    borderRadius: BorderRadius.circular(28),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: gradient[0].withOpacity(0.3),
+                                        blurRadius: 12,
+                                        offset: const Offset(0, 6),
+                                      ),
+                                    ],
+                                  ),
+                                  clipBehavior: Clip.antiAlias,
+                                  child: Stack(
+                                    children: [
+                                      // Decorative circles
+                                      Positioned(
+                                        right: -20,
+                                        top: -20,
+                                        child: Container(
+                                          width: 100,
+                                          height: 100,
+                                          decoration: BoxDecoration(
+                                            color: Colors.white.withOpacity(
+                                              0.1,
+                                            ),
+                                            shape: BoxShape.circle,
+                                          ),
+                                        ),
+                                      ),
+                                      Padding(
+                                        padding: const EdgeInsets.all(20),
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.end,
+                                          children: [
+                                            const Icon(
+                                              Icons.folder_rounded,
+                                              color: Colors.white,
+                                              size: 32,
+                                            ),
+                                            const Spacer(),
+                                            Text(
+                                              collection.name,
+                                              style: GoogleFonts.inter(
+                                                color: Colors.white,
+                                                fontSize: 18,
+                                                fontWeight: FontWeight.w800,
+                                                height: 1.2,
+                                              ),
+                                              maxLines: 2,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                            const SizedBox(height: 6),
+                                            FutureBuilder<int>(
+                                              future: quoteProvider
+                                                  .getCollectionQuoteCount(
+                                                    collection.id,
+                                                  ),
+                                              builder: (context, snapshot) {
+                                                return Text(
+                                                  '${snapshot.data ?? collection.quoteCount} Quotes',
+                                                  style: GoogleFonts.inter(
+                                                    color: Colors.white
+                                                        .withOpacity(0.8),
+                                                    fontSize: 13,
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                );
+                                              },
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                              );
-                            },
+                              ),
+                            ),
                           ),
-                          trailing: Icon(
-                            Icons.chevron_right_rounded,
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                          onTap: () => _viewCollection(context, collection),
-                        ),
-                      );
-                    },
+                        );
+                      },
+                    ),
                   ),
                 ),
         ),
@@ -868,6 +1009,22 @@ class _HomeScreenState extends State<HomeScreen>
           ),
           ListTile(
             title: const Text(
+              'Test Notifications',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+            leading: const Icon(Icons.notification_important_rounded),
+            subtitle: const Text('Send a test notification now'),
+            onTap: () async {
+              await NotificationService().showDailyQuoteNotification();
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Notification sent!')),
+                );
+              }
+            },
+          ),
+          ListTile(
+            title: const Text(
               'Seed Database',
               style: TextStyle(fontWeight: FontWeight.w600, color: Colors.red),
             ),
@@ -1048,9 +1205,14 @@ class _HomeScreenState extends State<HomeScreen>
     if (pickedTime != null) {
       await NotificationService().scheduleDailyQuoteNotification(pickedTime);
       if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Notification set!')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Daily notification set for ${pickedTime.format(context)}',
+            ),
+            backgroundColor: Colors.green,
+          ),
+        );
       }
     }
   }

@@ -151,6 +151,17 @@ class QuoteService {
     }
   }
 
+  Future<void> deleteAllFavorites() async {
+    try {
+      final userId = _supabase.auth.currentUser?.id;
+      if (userId == null) throw Exception('User not authenticated');
+
+      await _supabase.from('user_favorites').delete().eq('user_id', userId);
+    } catch (error) {
+      throw Exception('Failed to delete all favorites: $error');
+    }
+  }
+
   Future<List<Collection>> getUserCollections() async {
     try {
       final userId = _supabase.auth.currentUser?.id;
@@ -273,6 +284,14 @@ class QuoteService {
           .toList();
     } catch (error) {
       throw Exception('Failed to fetch collection quotes: $error');
+    }
+  }
+
+  Future<void> deleteCollection(String collectionId) async {
+    try {
+      await _supabase.from('collections').delete().eq('id', collectionId);
+    } catch (error) {
+      throw Exception('Failed to delete collection: $error');
     }
   }
 

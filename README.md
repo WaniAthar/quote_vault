@@ -70,7 +70,7 @@ A modern, full-featured quote discovery and collection app built with Flutter an
 This project was built primarily leveraging AI tools to accelerate development while maintaining high code quality.
 
 ### Tools Used:
-- **Claude Code:** Used as the primary architect and lead developer for scaffolding, logic implementation, and complex refactoring.
+- **OpenCode:** Used as the primary architect and lead developer for scaffolding, logic implementation, and complex refactoring.
 - **Grep/Glob Tools:** Used extensively for codebase exploration and ensuring architectural consistency.
 - **UI Redesign:** Leveraged AI to upgrade the UI from standard Material to a bespoke, minimalistic aesthetic with animations.
 

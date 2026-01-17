@@ -59,9 +59,12 @@ class NotificationService {
       );
 
       // If the time has already passed today, schedule for tomorrow
-      final notificationTime = scheduledTime.isBefore(now)
+      var notificationTime = scheduledTime.isBefore(now)
           ? scheduledTime.add(const Duration(days: 1))
           : scheduledTime;
+
+      print('Scheduling notification for: $notificationTime (Local)');
+      print('Current time: $now');
 
       await _notifications.zonedSchedule(
         0, // notification id
@@ -73,8 +76,9 @@ class NotificationService {
             _notificationChannelId,
             _notificationChannelName,
             channelDescription: _notificationChannelDescription,
-            importance: Importance.high,
+            importance: Importance.max, // Changed to Max
             priority: Priority.high,
+            ticker: 'ticker',
           ),
           iOS: DarwinNotificationDetails(),
         ),

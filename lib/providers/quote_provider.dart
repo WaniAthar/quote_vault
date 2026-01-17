@@ -201,6 +201,33 @@ class QuoteProvider with ChangeNotifier {
     return _favorites;
   }
 
+  Future<void> clearAllFavorites() async {
+    _isLoading = true;
+    _lastError = null;
+    notifyListeners();
+
+    try {
+      await _quoteService.deleteAllFavorites();
+
+      // Update local state
+      _favorites.clear();
+
+      // Update main quotes list status
+      for (var i = 0; i < _quotes.length; i++) {
+        if (_quotes[i].isFavorite) {
+          _quotes[i] = _quotes[i].copyWith(isFavorite: false);
+        }
+      }
+
+      notifyListeners();
+    } catch (error) {
+      _lastError = error.toString();
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
   // Collections methods
   Future<void> loadCollections() async {
     try {
@@ -251,11 +278,34 @@ class QuoteProvider with ChangeNotifier {
     String collectionId,
     String quoteId,
   ) async {
+    _isLoading = true;
+    _lastError = null;
+    notifyListeners();
+
     try {
       await _quoteService.removeQuoteFromCollection(collectionId, quoteId);
       await loadCollections(); // Refresh counts
     } catch (error) {
-      // Handle error
+      _lastError = error.toString();
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> deleteCollection(String collectionId) async {
+    _isLoading = true;
+    _lastError = null;
+    notifyListeners();
+
+    try {
+      await _quoteService.deleteCollection(collectionId);
+      await loadCollections(); // Refresh collections
+    } catch (error) {
+      _lastError = error.toString();
+    } finally {
+      _isLoading = false;
+      notifyListeners();
     }
   }
 

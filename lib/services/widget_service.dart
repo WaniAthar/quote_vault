@@ -8,6 +8,7 @@ class WidgetService {
 
   Future<void> updateWidget(Quote quote) async {
     try {
+      await HomeWidget.saveWidgetData<String>('quote_id', quote.id ?? '');
       await HomeWidget.saveWidgetData<String>('quote_text', quote.text);
       await HomeWidget.saveWidgetData<String>(
         'quote_author',
